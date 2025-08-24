@@ -1,7 +1,10 @@
 package com.backend.models;
 
+import com.backend.enums.Role;
 import jakarta.persistence.*;
 import lombok.Data;
+
+import java.util.List;
 
 @Entity
 @Table(name = "users")

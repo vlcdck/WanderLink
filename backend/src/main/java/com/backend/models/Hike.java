@@ -1,5 +1,6 @@
 package com.backend.models;
 
+import com.backend.enums.Difficulty;
 import jakarta.persistence.*;
 import lombok.Data;
 

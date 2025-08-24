@@ -1,5 +1,6 @@
 package com.backend.models;
 
+import com.backend.enums.Status;
 import jakarta.persistence.*;
 import lombok.Data;
 
