@@ -1,6 +1,6 @@
-package com.backend.models;
+package com.backend.models.user;
 
-import com.backend.enums.Role;
+import com.backend.models.hike.Hike;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -18,6 +18,7 @@ public class User {
     private String email;
     private String password;
 
+    @Enumerated(EnumType.STRING)
     private Role role;
 
     private String firstName;
@@ -31,4 +32,8 @@ public class User {
     @ManyToMany(mappedBy = "participants")
     private List<Hike> participatedHikes;
 
+    private boolean enabled = false;
+    private boolean accountNonLocked = true;
+    private boolean credentialsNonExpired = true;
+    private boolean accountNonExpired = true;
 }

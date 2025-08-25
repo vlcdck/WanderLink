@@ -1,4 +1,4 @@
-package com.backend.enums;
+package com.backend.models.hike;
 
 public enum Difficulty {
     EASY,

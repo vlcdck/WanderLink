@@ -1,6 +1,6 @@
-package com.backend.models;
+package com.backend.models.hike;
 
-import com.backend.enums.Status;
+import com.backend.models.user.User;
 import jakarta.persistence.*;
 import lombok.Data;
 
