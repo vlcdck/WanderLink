@@ -2,26 +2,25 @@ package com.backend.models.token;
 
 import com.backend.models.user.User;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "confirmation_tokens")
+@Table(name = "refresh_tokens",
+        indexes = {
+                @Index(columnList = "user_id"), @Index(columnList = "tokenHash", unique = true)
+        })
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class ConfirmationToken {
+public class RefreshToken {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String token;
+    private String tokenHash;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "user_id")
     private User user;
 
@@ -29,6 +28,5 @@ public class ConfirmationToken {
     private LocalDateTime expiresAt;
 
     @Column(nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
-
+    private boolean revoked = false;
 }

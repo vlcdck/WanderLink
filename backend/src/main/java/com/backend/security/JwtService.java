@@ -1,7 +1,9 @@
 package com.backend.security;
 
+import com.backend.exeptions.InvalidTokenException;
 import com.backend.models.user.Role;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -13,36 +15,36 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class JwtService {
     private final SecretKey key;
     private final long accessExpMinutes;
-    private final long refreshExpDays;
 
 
     public JwtService(
             @Value("${jwt.secret}") String secret,
-            @Value("${jwt.access-exp-min}") long accessExpMinutes,
-            @Value("${jwt.refresh-exp-days}") long refreshExpDays
+            @Value("${jwt.access-exp-min}") long accessExpMinutes
     ) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessExpMinutes = accessExpMinutes;
-        this.refreshExpDays = refreshExpDays;
     }
 
     public String generateAccessToken(Long userId, String email, Role role) {
         Instant now = Instant.now();
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("role", role.name());
-        claims.put("email", email);
+        Map<String, Object> claims = Map.of(
+                "role", role.name(),
+                "email", email,
+                "jti", UUID.randomUUID().toString()
+        );
 
 
         return Jwts.builder()
-                .setClaims(claims)
                 .setSubject(String.valueOf(userId))
+                .setIssuer("wanderlink-api")
+                .setClaims(claims)
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(now.plus(accessExpMinutes, ChronoUnit.MINUTES)))
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -50,43 +52,43 @@ public class JwtService {
     }
 
 
-    public String generateRefreshToken(Long userId) {
-        Instant now = Instant.now();
-        return Jwts.builder()
-                .setSubject(String.valueOf(userId))
-                .setIssuedAt(Date.from(now))
-                .setExpiration(Date.from(now.plus(refreshExpDays, ChronoUnit.DAYS)))
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
-    }
-
-
     public boolean isTokenValid(String token) {
         try {
-            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
+            parseToken(token);
             return true;
-        } catch (Exception e) {
+        } catch (InvalidTokenException e) {
             return false;
         }
     }
 
 
     public Long extractUserId(String token) {
-        Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
-        return Long.valueOf(claims.getSubject());
+        return Long.valueOf(parseToken(token).getSubject());
     }
 
 
     public String extractEmail(String token) {
-        Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
-        Object email = claims.get("email");
+        Object email = parseToken(token).get("email");
         return email != null ? email.toString() : null;
     }
 
 
     public String extractRole(String token) {
-        Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
-        Object role = claims.get("role");
+        Object role = parseToken(token).get("role");
         return role != null ? role.toString() : null;
+    }
+
+    private Claims parseToken(String token) {
+        try {
+            return Jwts.parserBuilder()
+                    .setSigningKey(key)
+                    .requireIssuer("wanderlink-api")
+                    .setAllowedClockSkewSeconds(60) // невеликий запас для розбіжностей часу
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+        } catch (JwtException e) {
+            throw new InvalidTokenException();
+        }
     }
 }

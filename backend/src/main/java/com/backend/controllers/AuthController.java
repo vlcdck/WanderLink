@@ -2,13 +2,16 @@ package com.backend.controllers;
 
 import com.backend.dto.auth.AuthResponse;
 import com.backend.dto.auth.LoginRequest;
+import com.backend.dto.auth.RefreshTokenRequest;
 import com.backend.dto.auth.RegisterRequest;
 import com.backend.services.auth.AuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -17,24 +20,27 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<String> register(@RequestBody RegisterRequest req) {
-        authService.register(req);
-        return ResponseEntity.ok("Check your email for confirmation link");
+    public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest req, Locale locale) {
+        authService.register(req, locale);
+        return ResponseEntity.status(HttpStatus.CREATED).body("Check your email for confirmation link");
     }
 
     @GetMapping("/confirm")
     public ResponseEntity<AuthResponse> confirm(@RequestParam String token) {
-        return ResponseEntity.ok(authService.confirm(token));
+        AuthResponse response = authService.confirm(token);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest req) {
-        return ResponseEntity.ok(authService.login(req));
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest req) {
+        AuthResponse response = authService.login(req);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<AuthResponse> refresh(@RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(authService.refresh(body.get("refreshToken")));
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest req) {
+        AuthResponse response = authService.refresh(req.getRefreshToken());
+        return ResponseEntity.ok(response);
     }
 }
 

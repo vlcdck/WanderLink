@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="#{email.confirmation.subject}">Confirm your email</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 20px auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .header { text-align: center; border-bottom: 1px solid #eee; padding-bottom: 20px; }
+        .content { padding: 20px 0; line-height: 1.6; }
+        .button-container { text-align: center; margin: 20px 0; }
+        .footer { text-align: center; font-size: 12px; color: #777; border-top: 1px solid #eee; padding-top: 20px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1 th:text="#{email.confirmation.header}">Confirm your account</h1>
+    </div>
+    <div class="content">
+        <p th:text="#{email.confirmation.welcome}">Welcome!</p>
+        <p th:text="#{email.confirmation.message}">Thank you for registering. Please click the button below to confirm your email address and activate your account.</p>
+        <div class="button-container">
+            <a th:href="#{email.confirmation.button}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                Verify your account
+            </a>
+        </div>
+        <p th:text="#{email.confirmation.fallback_text}">If the button does not work, copy and paste this link into your browser:</p>
+        <p><a th:href="${confirmationLink}" th:text="${confirmationLink}">Confirmation Link</a></p>
+    </div>
+    <div class="footer">
+        <p th:text="#{email.confirmation.footer}">This is an automatically generated letter. Please do not reply to it.</p>
+    </div>
+</div>
+</body>
+</html>
