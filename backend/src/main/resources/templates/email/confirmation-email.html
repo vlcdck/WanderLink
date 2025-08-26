@@ -21,7 +21,7 @@
         <p th:text="#{email.confirmation.welcome}">Welcome!</p>
         <p th:text="#{email.confirmation.message}">Thank you for registering. Please click the button below to confirm your email address and activate your account.</p>
         <div class="button-container">
-            <a th:href="#{email.confirmation.button}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+            <a th:href="${confirmationLink}" th:text="#{email.confirmation.button}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
                 Verify your account
             </a>
         </div>
