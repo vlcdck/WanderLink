@@ -1,5 +1,6 @@
 package com.backend.dto.auth;
 
+import com.backend.dto.user.UserDTO;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -8,4 +9,5 @@ import lombok.Data;
 public class AuthResponse {
     private String accessToken;
     private String refreshToken;
+    private UserDTO user;
 }

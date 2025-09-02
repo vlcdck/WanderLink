@@ -4,6 +4,7 @@ import com.backend.dto.auth.AuthResponse;
 import com.backend.dto.auth.LoginRequest;
 import com.backend.dto.auth.RegisterRequest;
 import com.backend.exeptions.*;
+import com.backend.mappers.UserMapper;
 import com.backend.models.token.ConfirmationToken;
 import com.backend.models.token.RefreshToken;
 import com.backend.models.user.Role;
@@ -13,6 +14,7 @@ import com.backend.repository.RefreshTokenRepository;
 import com.backend.repository.UserRepository;
 import com.backend.security.JwtService;
 import com.backend.security.UserPrincipal;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +32,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthService {
 
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -42,9 +45,7 @@ public class AuthService {
     private long refreshExpDays;
 
     public void register(RegisterRequest req, Locale locale) {
-        if (userRepository.existsByEmail(req.getEmail())) {
-            throw new EmailAlreadyUsedException();
-        }
+        if (userRepository.existsByEmail(req.getEmail())) throw new EmailAlreadyUsedException();
 
         User user = new User();
         user.setEmail(req.getEmail());
@@ -61,7 +62,6 @@ public class AuthService {
         token.setToken(UUID.randomUUID().toString());
         token.setUser(user);
         token.setExpiresAt(LocalDateTime.now().plusHours(12));
-
         tokenRepository.save(token);
 
         emailService.sendConfirmationEmail(user.getEmail(), token.getToken(), locale);
@@ -71,32 +71,48 @@ public class AuthService {
         ConfirmationToken confirmation = tokenRepository.findByToken(token)
                 .orElseThrow(InvalidTokenException::new);
 
-        if (confirmation.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (confirmation.getExpiresAt().isBefore(LocalDateTime.now()))
             throw new ExpiredTokenException();
-        }
 
         User user = confirmation.getUser();
         user.setEnabled(true);
         userRepository.save(user);
-
         tokenRepository.delete(confirmation);
 
         return generateTokens(user);
     }
 
+    @Transactional
+    public void resendConfirmation(String email, Locale locale) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException(email));
+
+        if (user.isEnabled()) {
+            throw new AlreadyConfirmedException();
+        }
+
+        // Можна: видалити старі токени для цього юзера, щоб не плодити
+        tokenRepository.deleteAllByUserId(user.getId());
+
+        ConfirmationToken token = new ConfirmationToken();
+        token.setToken(UUID.randomUUID().toString());
+        token.setUser(user);
+        token.setExpiresAt(LocalDateTime.now().plusHours(12));
+        tokenRepository.save(token);
+
+        emailService.sendConfirmationEmail(user.getEmail(), token.getToken(), locale);
+    }
+
+    @Transactional
     public AuthResponse login(LoginRequest req) {
         Authentication auth = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(req.getEmail(), req.getPassword())
         );
-
         User user = ((UserPrincipal) auth.getPrincipal()).getUser();
 
-        if (!user.isEnabled()) {
-            throw new AccountNotConfirmedException();
-        }
+        if (!user.isEnabled()) throw new AccountNotConfirmedException();
 
         refreshTokenRepository.revokeAllByUserId(user.getId());
-
         return generateTokens(user);
     }
 
@@ -104,41 +120,41 @@ public class AuthService {
         RefreshToken stored = refreshTokenRepository.findByTokenHash(hash(rawRefreshToken))
                 .orElseThrow(InvalidTokenException::new);
 
-        if (stored.isRevoked() || stored.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (stored.isRevoked() || stored.getExpiresAt().isBefore(LocalDateTime.now()))
             throw new RefreshTokenInvalidException();
-        }
-
-        User user = stored.getUser();
 
         stored.setRevoked(true);
         refreshTokenRepository.save(stored);
 
-        return generateTokens(user);
+        return generateTokens(stored.getUser());
+    }
 
+    public void revokeRefreshToken(String rawRefreshToken) {
+        refreshTokenRepository.findByTokenHash(hash(rawRefreshToken))
+                .ifPresent(token -> {
+                    token.setRevoked(true);
+                    refreshTokenRepository.save(token);
+                });
     }
 
     private AuthResponse generateTokens(User user) {
         String access = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
+        String rawRefresh = UUID.randomUUID() + "." + UUID.randomUUID();
 
-        String rawRefresh = generateOpaqueToken();
+        System.out.println("Generated tokens: access=" + access + ", refresh=" + rawRefresh);
 
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setTokenHash(hash(rawRefresh));
         refreshToken.setUser(user);
         refreshToken.setExpiresAt(LocalDateTime.now().plusDays(refreshExpDays));
         refreshToken.setRevoked(false);
-
         refreshTokenRepository.save(refreshToken);
 
-
-        return new AuthResponse(access, rawRefresh);
+        // Мапимо юзера на DTO
+        return new AuthResponse(access, rawRefresh, UserMapper.toDTO(user));
     }
 
     private String hash(String raw) {
         return DigestUtils.sha256Hex(raw);
-    }
-
-    private String generateOpaqueToken() {
-        return UUID.randomUUID() + "." + UUID.randomUUID();
     }
 }

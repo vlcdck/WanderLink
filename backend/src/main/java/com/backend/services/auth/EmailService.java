@@ -29,11 +29,8 @@ public class EmailService {
     private final TemplateEngine templateEngine;
     private final MessageSource messageSource;
 
-    @Value("${app.domain}")
-    private String appDomain;
-
-    @Value("${email.confirmation.path}")
-    private String confirmationPath;
+    @Value("${app.frontend.domain}") // Наприклад: https://myapp.com
+    private String frontendDomain;
 
     @Value("${app.mail.from.address}")
     private String fromAddress;
@@ -44,11 +41,9 @@ public class EmailService {
     @Async
     public void sendConfirmationEmail(String to, String token, Locale locale) {
         if (!EmailValidator.getInstance().isValid(to)) {
-            log.warn("Incorrect email address: {}", maskEmail(to));
+            log.warn("Invalid email address: {}", maskEmail(to));
             return;
         }
-
-        validateConfig();
 
         Locale effectiveLocale = (locale != null ? locale : Locale.ENGLISH);
         LocaleContextHolder.setLocale(effectiveLocale);
@@ -58,33 +53,21 @@ public class EmailService {
         try {
             MimeMessage message = createMessage(to, body, effectiveLocale);
             mailSender.send(message);
-            log.info("A confirmation email has been successfully sent to: {} ({})",
-                    maskEmail(to), effectiveLocale);
-
-        } catch (MessagingException e) {
-            log.error("Error when generating email for {}", maskEmail(to), e);
-        } catch (MailException e) {
-            log.error("Error sending email to {}", maskEmail(to), e);
-            throw e;
-        }
-    }
-
-    private void validateConfig() {
-        if (appDomain == null || appDomain.isBlank()) {
-            throw new IllegalStateException("App domain is not configured");
-        }
-        if (confirmationPath == null || confirmationPath.isBlank()) {
-            throw new IllegalStateException("Confirmation path is not configured");
-        }
-        if (fromAddress == null || fromAddress.isBlank()) {
-            throw new IllegalStateException("Email sender address is not configured");
+            log.info("Confirmation email sent to {} ({})", maskEmail(to), effectiveLocale);
+        } catch (MessagingException | MailException e) {
+            log.error("Failed to send email to {}", maskEmail(to), e);
+            throw new RuntimeException(e);
         }
     }
 
     private String generateEmailBody(String token, Locale locale) {
-        String link = appDomain + confirmationPath + "?token=" + token;
+        String link = frontendDomain + "/confirm?token=" + token;
+
         Context context = new Context(locale);
         context.setVariable("confirmationLink", link);
+        context.setVariable("token", token);
+        context.setVariable("frontendUrl", frontendDomain);
+
         return templateEngine.process("email/confirmation-email", context);
     }
 
@@ -95,18 +78,17 @@ public class EmailService {
         try {
             helper.setFrom(fromAddress, fromName);
         } catch (UnsupportedEncodingException e) {
-            log.error("Sender configuration error, only address is used", e);
+            log.warn("Fallback: using only email address as sender", e);
             helper.setFrom(fromAddress);
         }
 
         helper.setTo(to);
 
         String subject = messageSource.getMessage("email.confirmation.subject", null, locale);
-
         helper.setSubject(subject);
         helper.setText(body, true); // HTML
 
-        return message;
+        return helper.getMimeMessage();
     }
 
     private String maskEmail(String email) {

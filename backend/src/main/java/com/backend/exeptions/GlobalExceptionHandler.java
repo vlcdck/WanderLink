@@ -3,6 +3,8 @@ package com.backend.exeptions;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
@@ -32,6 +34,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ExpiredTokenException.class)
     public ResponseEntity<Map<String, Object>> handleExpiredToken(ExpiredTokenException e) {
         return buildResponse(HttpStatus.UNAUTHORIZED, e.getMessage());
+    }
+
+    @ExceptionHandler({BadCredentialsException.class, UsernameNotFoundException.class})
+    public ResponseEntity<Map<String, Object>> handleBadCredentials(RuntimeException e) {
+        return buildResponse(HttpStatus.UNAUTHORIZED, "Invalid email or password");
+    }
+
+    @ExceptionHandler(AlreadyConfirmedException.class)
+    public ResponseEntity<Map<String, Object>> handleAlreadyConfirmed(AlreadyConfirmedException e) {
+        return buildResponse(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleUserNotFound(UserNotFoundException e) {
+        return buildResponse(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
