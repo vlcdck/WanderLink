@@ -90,6 +90,15 @@ const AuthForm: FC<AuthFormProps> = ({isRegister, toggleMode}) => {
                         ? "Зареєструватися"
                         : "Увійти"}
             </button>
+            <button
+                type="button"
+                onClick={() => {
+                    window.location.href = "http://localhost:8080/oauth2/authorization/google";
+                }}
+                className="bg-red-500 text-white w-full py-2 rounded mb-2 hover:bg-red-600 transition"
+            >
+                Увійти через Google
+            </button>
             <p className="text-center text-gray-500 mt-2">
                 {isRegister ? "Вже маєте акаунт?" : "Немає акаунта?"}{" "}
                 <span
