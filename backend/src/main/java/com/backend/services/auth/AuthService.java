@@ -44,6 +44,23 @@ public class AuthService {
     @Value("${jwt.refresh-exp-days}")
     private long refreshExpDays;
 
+    @Transactional
+    public AuthResponse loginOrRegisterGoogle(String email, String fullName) {
+        User user = userRepository.findByEmail(email).orElseGet(() -> {
+            User newUser = new User();
+            newUser.setEmail(email);
+            newUser.setUsername(email.split("@")[0]);
+            newUser.setFirstName(fullName.split(" ")[0]);
+            newUser.setLastName(fullName.contains(" ") ? fullName.split(" ")[1] : "");
+            newUser.setRole(Role.TOURIST);
+            newUser.setEnabled(true); // OAuth користувачі підтверджені автоматично
+            return userRepository.save(newUser);
+        });
+
+        refreshTokenRepository.revokeAllByUserId(user.getId());
+        return generateTokens(user);
+    }
+
     public void register(RegisterRequest req, Locale locale) {
         if (userRepository.existsByEmail(req.getEmail())) throw new EmailAlreadyUsedException();
 
