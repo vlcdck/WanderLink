@@ -4,7 +4,9 @@ import com.backend.models.hike.Hike;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "users")
@@ -17,6 +19,9 @@ public class User {
     private String username;
     private String email;
     private String password;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserProvider> providers = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
     private Role role;

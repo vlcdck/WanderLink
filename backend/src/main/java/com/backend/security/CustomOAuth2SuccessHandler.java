@@ -17,20 +17,21 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class CustomOAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
-    private final ApplicationContext context; // ✅ замість AuthService напряму
+    private final ApplicationContext context;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
                                         HttpServletResponse response,
                                         Authentication authentication) throws IOException {
         OAuth2User oauthUser = (OAuth2User) authentication.getPrincipal();
+
         String email = oauthUser.getAttribute("email");
         String name = oauthUser.getAttribute("name");
+        String googleId = oauthUser.getAttribute("sub"); // ✅ унікальний ID від Google
 
         AuthService authService = context.getBean(AuthService.class);
-        AuthResponse tokens = authService.loginOrRegisterGoogle(email, name);
+        AuthResponse tokens = authService.loginOrRegisterGoogle(email, name, googleId);
 
-        // 🔑 редіректимо на фронт з токенами
         String redirectUrl = "http://localhost:5173/oauth2/redirect" +
                 "?accessToken=" + tokens.getAccessToken() +
                 "&refreshToken=" + tokens.getRefreshToken();

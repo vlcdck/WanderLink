@@ -51,6 +51,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
+    @ExceptionHandler(LoginWithGoogleOnlyException.class)
+    public ResponseEntity<String> handleGoogleOnlyLogin(LoginWithGoogleOnlyException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneric(Exception e) {
         log.error("Unexpected error occurred", e);

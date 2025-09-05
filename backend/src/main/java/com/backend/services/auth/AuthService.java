@@ -7,8 +7,10 @@ import com.backend.exeptions.*;
 import com.backend.mappers.UserMapper;
 import com.backend.models.token.ConfirmationToken;
 import com.backend.models.token.RefreshToken;
+import com.backend.models.user.AuthProvider;
 import com.backend.models.user.Role;
 import com.backend.models.user.User;
+import com.backend.models.user.UserProvider;
 import com.backend.repository.ConfirmationTokenRepository;
 import com.backend.repository.RefreshTokenRepository;
 import com.backend.repository.UserRepository;
@@ -16,6 +18,7 @@ import com.backend.security.JwtService;
 import com.backend.security.UserPrincipal;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -30,6 +33,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthService {
 
 
@@ -44,25 +48,28 @@ public class AuthService {
     @Value("${jwt.refresh-exp-days}")
     private long refreshExpDays;
 
+    /**
+     * Логін або реєстрація через Google
+     */
     @Transactional
-    public AuthResponse loginOrRegisterGoogle(String email, String fullName) {
-        User user = userRepository.findByEmail(email).orElseGet(() -> {
-            User newUser = new User();
-            newUser.setEmail(email);
-            newUser.setUsername(email.split("@")[0]);
-            newUser.setFirstName(fullName.split(" ")[0]);
-            newUser.setLastName(fullName.contains(" ") ? fullName.split(" ")[1] : "");
-            newUser.setRole(Role.TOURIST);
-            newUser.setEnabled(true); // OAuth користувачі підтверджені автоматично
-            return userRepository.save(newUser);
-        });
+    public AuthResponse loginOrRegisterGoogle(String email, String fullName, String googleId) {
+        User user = userRepository.findByEmail(email).orElseGet(() -> createGoogleUser(email, fullName, googleId));
 
-        refreshTokenRepository.revokeAllByUserId(user.getId());
+        // Якщо акаунт вже існує, але без Google → додаємо Google як провайдера
+        addProviderIfMissing(user, AuthProvider.GOOGLE, googleId);
+
+        revokeAllTokens(user);
         return generateTokens(user);
     }
 
-    public void register(RegisterRequest req, Locale locale) {
-        if (userRepository.existsByEmail(req.getEmail())) throw new EmailAlreadyUsedException();
+    /**
+     * Звичайна реєстрація
+     */
+    @Transactional
+    public AuthResponse register(RegisterRequest req, Locale locale) {
+        if (userRepository.existsByEmail(req.getEmail())) {
+            throw new EmailAlreadyUsedException();
+        }
 
         User user = new User();
         user.setEmail(req.getEmail());
@@ -71,25 +78,25 @@ public class AuthService {
         user.setFirstName(req.getFirstName());
         user.setLastName(req.getLastName());
         user.setRole(Role.TOURIST);
-        user.setEnabled(false);
+        user.setEnabled(false); // треба підтвердити email
 
+        addProvider(user, AuthProvider.LOCAL, null);
         userRepository.save(user);
 
-        ConfirmationToken token = new ConfirmationToken();
-        token.setToken(UUID.randomUUID().toString());
-        token.setUser(user);
-        token.setExpiresAt(LocalDateTime.now().plusHours(12));
-        tokenRepository.save(token);
-
-        emailService.sendConfirmationEmail(user.getEmail(), token.getToken(), locale);
+        createAndSendConfirmationToken(user, locale);
+        return null; // можна повернути DTO з повідомленням
     }
 
+    /**
+     * Підтвердження акаунта
+     */
     public AuthResponse confirm(String token) {
         ConfirmationToken confirmation = tokenRepository.findByToken(token)
                 .orElseThrow(InvalidTokenException::new);
 
-        if (confirmation.getExpiresAt().isBefore(LocalDateTime.now()))
+        if (confirmation.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new ExpiredTokenException();
+        }
 
         User user = confirmation.getUser();
         user.setEnabled(true);
@@ -99,6 +106,9 @@ public class AuthService {
         return generateTokens(user);
     }
 
+    /**
+     * Повторна відправка підтвердження
+     */
     @Transactional
     public void resendConfirmation(String email, Locale locale) {
         User user = userRepository.findByEmail(email)
@@ -108,9 +118,85 @@ public class AuthService {
             throw new AlreadyConfirmedException();
         }
 
-        // Можна: видалити старі токени для цього юзера, щоб не плодити
         tokenRepository.deleteAllByUserId(user.getId());
+        createAndSendConfirmationToken(user, locale);
+    }
 
+    /**
+     * Логін локального користувача
+     */
+    @Transactional
+    public AuthResponse login(LoginRequest req) {
+        User user = userRepository.findByEmail(req.getEmail())
+                .orElseThrow(() -> new UserNotFoundException(req.getEmail()));
+
+        // Якщо акаунт тільки з Google → не даємо логінитись локально
+        boolean googleOnly = user.getPassword() == null &&
+                user.getProviders().stream().anyMatch(p -> p.getProvider() == AuthProvider.GOOGLE);
+
+        if (googleOnly) {
+            throw new LoginWithGoogleOnlyException("Акаунт створено через Google. Використовуйте Google login.");
+        }
+
+        // Валідація пароля
+        Authentication auth = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(req.getEmail(), req.getPassword())
+        );
+
+        User authenticatedUser = ((UserPrincipal) auth.getPrincipal()).getUser();
+
+        if (!authenticatedUser.isEnabled()) {
+            throw new AccountNotConfirmedException();
+        }
+
+        return loginExistingUser(authenticatedUser);
+    }
+
+    /**
+     * Refresh токена
+     */
+    public AuthResponse refresh(String rawRefreshToken) {
+        RefreshToken stored = refreshTokenRepository.findByTokenHash(hash(rawRefreshToken))
+                .orElseThrow(InvalidTokenException::new);
+
+        if (stored.isRevoked() || stored.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new RefreshTokenInvalidException();
+        }
+
+        stored.setRevoked(true);
+        refreshTokenRepository.save(stored);
+
+        return generateTokens(stored.getUser());
+    }
+
+    /**
+     * Відкликання refresh токена
+     */
+    public void revokeRefreshToken(String rawRefreshToken) {
+        refreshTokenRepository.findByTokenHash(hash(rawRefreshToken))
+                .ifPresent(token -> {
+                    token.setRevoked(true);
+                    refreshTokenRepository.save(token);
+                });
+    }
+
+    // ==================== PRIVATE HELPERS ====================
+
+    private User createGoogleUser(String email, String fullName, String googleId) {
+        User newUser = new User();
+        newUser.setEmail(email);
+        newUser.setUsername(email.split("@")[0]);
+        newUser.setFirstName(fullName.split(" ")[0]);
+        newUser.setLastName(fullName.contains(" ") ? fullName.split(" ")[1] : "");
+        newUser.setRole(Role.TOURIST);
+        newUser.setEnabled(true); // OAuth користувач відразу активний
+        newUser.setPassword(null);
+
+        addProvider(newUser, AuthProvider.GOOGLE, googleId);
+        return userRepository.save(newUser);
+    }
+
+    private void createAndSendConfirmationToken(User user, Locale locale) {
         ConfirmationToken token = new ConfirmationToken();
         token.setToken(UUID.randomUUID().toString());
         token.setUser(user);
@@ -120,54 +206,47 @@ public class AuthService {
         emailService.sendConfirmationEmail(user.getEmail(), token.getToken(), locale);
     }
 
-    @Transactional
-    public AuthResponse login(LoginRequest req) {
-        Authentication auth = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(req.getEmail(), req.getPassword())
-        );
-        User user = ((UserPrincipal) auth.getPrincipal()).getUser();
+    private void addProvider(User user, AuthProvider provider, String providerUserId) {
+        UserProvider userProvider = UserProvider.builder()
+                .provider(provider)
+                .providerUserId(providerUserId)
+                .user(user)
+                .build();
+        user.getProviders().add(userProvider);
+    }
 
-        if (!user.isEnabled()) throw new AccountNotConfirmedException();
+    private void addProviderIfMissing(User user, AuthProvider provider, String providerUserId) {
+        boolean exists = user.getProviders().stream()
+                .anyMatch(p -> p.getProvider() == provider);
 
+        if (!exists) {
+            addProvider(user, provider, providerUserId);
+            userRepository.save(user);
+        }
+    }
+
+    private void revokeAllTokens(User user) {
         refreshTokenRepository.revokeAllByUserId(user.getId());
+    }
+
+    private AuthResponse loginExistingUser(User user) {
+        revokeAllTokens(user);
         return generateTokens(user);
-    }
-
-    public AuthResponse refresh(String rawRefreshToken) {
-        RefreshToken stored = refreshTokenRepository.findByTokenHash(hash(rawRefreshToken))
-                .orElseThrow(InvalidTokenException::new);
-
-        if (stored.isRevoked() || stored.getExpiresAt().isBefore(LocalDateTime.now()))
-            throw new RefreshTokenInvalidException();
-
-        stored.setRevoked(true);
-        refreshTokenRepository.save(stored);
-
-        return generateTokens(stored.getUser());
-    }
-
-    public void revokeRefreshToken(String rawRefreshToken) {
-        refreshTokenRepository.findByTokenHash(hash(rawRefreshToken))
-                .ifPresent(token -> {
-                    token.setRevoked(true);
-                    refreshTokenRepository.save(token);
-                });
     }
 
     private AuthResponse generateTokens(User user) {
         String access = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
         String rawRefresh = UUID.randomUUID() + "." + UUID.randomUUID();
 
-        System.out.println("Generated tokens: access=" + access + ", refresh=" + rawRefresh);
-
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setTokenHash(hash(rawRefresh));
         refreshToken.setUser(user);
         refreshToken.setExpiresAt(LocalDateTime.now().plusDays(refreshExpDays));
         refreshToken.setRevoked(false);
-        refreshTokenRepository.save(refreshToken);
 
-        // Мапимо юзера на DTO
+        refreshTokenRepository.save(refreshToken);
+        log.info("🔑 Tokens generated for user {}", user.getEmail());
+
         return new AuthResponse(access, rawRefresh, UserMapper.toDTO(user));
     }
 
