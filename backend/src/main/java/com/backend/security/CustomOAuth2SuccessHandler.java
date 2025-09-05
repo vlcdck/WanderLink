@@ -27,17 +27,14 @@ public class CustomOAuth2SuccessHandler implements AuthenticationSuccessHandler 
         String email = oauthUser.getAttribute("email");
         String name = oauthUser.getAttribute("name");
 
-        // ✅ Беремо AuthService тільки тут, без створення циклу
         AuthService authService = context.getBean(AuthService.class);
         AuthResponse tokens = authService.loginOrRegisterGoogle(email, name);
 
-        String jsonResponse = String.format(
-                "{\"accessToken\":\"%s\",\"refreshToken\":\"%s\"}",
-                tokens.getAccessToken(),
-                tokens.getRefreshToken()
-        );
+        // 🔑 редіректимо на фронт з токенами
+        String redirectUrl = "http://localhost:5173/oauth2/redirect" +
+                "?accessToken=" + tokens.getAccessToken() +
+                "&refreshToken=" + tokens.getRefreshToken();
 
-        response.setContentType("application/json");
-        response.getWriter().write(jsonResponse);
+        response.sendRedirect(redirectUrl);
     }
 }
