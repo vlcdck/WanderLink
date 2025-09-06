@@ -6,7 +6,7 @@ export const useResendEmail = () => {
     const [message, setMessage] = useState<string | null>(null);
 
     const resend = async () => {
-        const email = localStorage.getItem("registeredEmail");
+        const email = sessionStorage.getItem("registeredEmail");
         if (!email) return;
 
         setResending(true);
@@ -15,6 +15,7 @@ export const useResendEmail = () => {
         try {
             await api.post("/auth/resend-confirmation", null, { params: { email } });
             setMessage("Лист повторно відправлено ✅");
+            sessionStorage.removeItem("registeredEmail");
         } catch {
             setMessage("Не вдалося відправити лист ❌");
         } finally {

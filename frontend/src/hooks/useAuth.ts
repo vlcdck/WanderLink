@@ -28,7 +28,7 @@ export const useAuth = () => {
 
         try {
             await api.post("/auth/register", data);
-            localStorage.setItem("registeredEmail", data.email);
+            sessionStorage.setItem("registeredEmail", data.email);
             navigate("/check-email");
         } catch (err: unknown) {
             if (axios.isAxiosError(err)) {
