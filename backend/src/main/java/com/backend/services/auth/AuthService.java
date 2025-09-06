@@ -66,7 +66,7 @@ public class AuthService {
      * Звичайна реєстрація
      */
     @Transactional
-    public AuthResponse register(RegisterRequest req, Locale locale) {
+    public void register(RegisterRequest req, Locale locale) {
         if (userRepository.existsByEmail(req.getEmail())) {
             throw new EmailAlreadyUsedException();
         }
@@ -84,7 +84,6 @@ public class AuthService {
         userRepository.save(user);
 
         createAndSendConfirmationToken(user, locale);
-        return null; // можна повернути DTO з повідомленням
     }
 
     /**
