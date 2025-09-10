@@ -7,6 +7,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -18,6 +19,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(EmailAlreadyUsedException.class)
     public ResponseEntity<Map<String, Object>> handleEmailUsed(EmailAlreadyUsedException e) {
+        return buildResponse(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(UsernameAlreadyUsedException.class)
+    public ResponseEntity<Map<String, Object>> handleUsernameAlreadyUsed(UsernameAlreadyUsedException e) {
         return buildResponse(HttpStatus.CONFLICT, e.getMessage());
     }
 
@@ -54,6 +60,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(LoginWithGoogleOnlyException.class)
     public ResponseEntity<String> handleGoogleOnlyLogin(LoginWithGoogleOnlyException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException e) {
+        return buildResponse(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleMaxSizeException(MaxUploadSizeExceededException e) {
+        return buildResponse(HttpStatus.BAD_REQUEST, "File size exceeds maximum allowed");
     }
 
     @ExceptionHandler(Exception.class)

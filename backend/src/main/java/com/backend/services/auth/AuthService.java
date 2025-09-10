@@ -71,6 +71,10 @@ public class AuthService {
             throw new EmailAlreadyUsedException();
         }
 
+        if (userRepository.existsByUsername(req.getUsername())) {
+            throw new UsernameAlreadyUsedException();
+        }
+
         User user = new User();
         user.setEmail(req.getEmail());
         user.setUsername(req.getUsername());
