@@ -31,6 +31,15 @@ public class User {
     private String avatarUrl;
     private Double rating;
 
+    private String bio;
+    @Enumerated(EnumType.STRING)
+    private ExperienceLevel experienceLevel;
+    private Double weight;
+    private Double height;
+    private Boolean hasMedicalConditions;
+    private String medicalNotes;
+    private String phoneNumber;
+
     @OneToMany(mappedBy = "organizer")
     private List<Hike> organizedHikes;
 

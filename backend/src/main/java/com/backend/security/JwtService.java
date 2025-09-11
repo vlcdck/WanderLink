@@ -82,7 +82,7 @@ public class JwtService {
         try {
             return Jwts.parserBuilder()
                     .setSigningKey(key)
-                    .requireIssuer("wanderlink-api")
+//                    .requireIssuer("wanderlink-api")
                     .setAllowedClockSkewSeconds(60) // невеликий запас для розбіжностей часу
                     .build()
                     .parseClaimsJws(token)

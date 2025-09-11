@@ -40,12 +40,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                         SecurityContextHolder.getContext().setAuthentication(auth);
                     }
+                } else {
+                    sendUnauthorized(response);
+                    return; // не продовжуємо фільтри
                 }
             } catch (Exception e) {
                 log.warn("JWT token is invalid or expired: {}", token, e);
+                sendUnauthorized(response);
+                return; // не продовжуємо фільтри
             }
         }
 
         chain.doFilter(request, response);
+    }
+
+    private void sendUnauthorized(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.getWriter().write("{\"error\":\"Unauthorized\"}");
     }
 }

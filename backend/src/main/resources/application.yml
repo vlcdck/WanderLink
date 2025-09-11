@@ -1,0 +1,57 @@
+server:
+  port: 8080
+
+app:
+  frontend:
+    domain: ${FRONTEND_DOMAIN:http://localhost:5173}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+    allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
+  upload:
+    avatar-dir: ${AVATAR_DIR:uploads/avatars/}
+    max-file-size: ${MAX_FILE_SIZE:5242880} # 5MB
+  mail:
+    from:
+      address: ${MAIL_FROM_ADDRESS:noreply@wanderlink.com}
+      name: ${MAIL_FROM_NAME:Wanderlink}
+
+jwt:
+  secret: ${JWT_SECRET:dev-secret-key-change-me}
+  access-exp-min: ${JWT_ACCESS_EXP_MIN:15}
+  refresh-exp-days: ${JWT_REFRESH_EXP_DAYS:14}
+
+spring:
+  config:
+    import: "optional:file:.env"
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:WanderLinkDB}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:rootroot}
+  jpa:
+    hibernate:
+      ddl-auto: ${DB_DDL_AUTO:create}
+    show-sql: true
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:test@gmail.com}
+    password: ${MAIL_PASSWORD:password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:your-dev-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:your-dev-client-secret}
+            scope: email,profile
+        provider:
+          google:
+            issuer-uri: https://accounts.google.com
