@@ -18,7 +18,6 @@ import com.backend.security.JwtService;
 import com.backend.security.UserPrincipal;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -33,7 +32,6 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class AuthService {
 
 
@@ -138,7 +136,7 @@ public class AuthService {
                 user.getProviders().stream().anyMatch(p -> p.getProvider() == AuthProvider.GOOGLE);
 
         if (googleOnly) {
-            throw new LoginWithGoogleOnlyException("Акаунт створено через Google. Використовуйте Google login.");
+            throw new LoginWithGoogleOnlyException(req.getEmail());
         }
 
         // Валідація пароля
@@ -248,7 +246,6 @@ public class AuthService {
         refreshToken.setRevoked(false);
 
         refreshTokenRepository.save(refreshToken);
-        log.info("🔑 Tokens generated for user {}", user.getEmail());
 
         return new AuthResponse(access, rawRefresh, UserMapper.toDTO(user));
     }

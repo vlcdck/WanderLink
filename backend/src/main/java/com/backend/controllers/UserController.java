@@ -56,6 +56,14 @@ public class UserController {
         return ResponseEntity.ok("Avatar updated successfully");
     }
 
+    @DeleteMapping("me/avatar")
+    public ResponseEntity<String> deleteAvatar(
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        userService.deleteAvatar(principal.getUser());
+        return ResponseEntity.ok("Avatar deleted successfully");
+    }
+
     @GetMapping("/me/hikes/participated")
     public ResponseEntity<List<HikeDTO>> getParticipatedHikes(@AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(userService.getParticipatedHikes(principal.getUser().getId()));

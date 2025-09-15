@@ -8,7 +8,7 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
     allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
   upload:
-    avatar-dir: ${AVATAR_DIR:uploads/avatars/}
+    base-dir: ${AVATAR_DIR:uploads/avatars/}
     max-file-size: ${MAX_FILE_SIZE:5242880} # 5MB
   mail:
     from:

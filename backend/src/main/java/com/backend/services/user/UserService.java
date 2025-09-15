@@ -8,18 +8,14 @@ import com.backend.mappers.HikeMapper;
 import com.backend.mappers.UserMapper;
 import com.backend.models.user.User;
 import com.backend.repository.UserRepository;
+import com.backend.services.avatar.AvatarService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 
 @Service
@@ -28,12 +24,7 @@ import java.util.List;
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-
-    @Value("${app.upload.avatar-dir}")
-    private String avatarUploadDir;
-
-    @Value("${app.upload.max-file-size}")
-    private long maxFileSizeBytes;
+    private final AvatarService avatarService;
 
     public UserProfileDTO getProfile(User user) {
         return UserMapper.toProfileDTO(user);
@@ -59,41 +50,21 @@ public class UserService {
     public void updateAvatar(User user, MultipartFile avatar) {
         if (avatar == null || avatar.isEmpty()) return;
 
-        validateFileSize(avatar);
-        try {
-            String filename = storeAvatar(avatar, user.getId());
-            user.setAvatarUrl("/" + avatarUploadDir + filename);
-            userRepository.save(user);
-        } catch (IOException e) {
-            log.error("Failed to store avatar for user {}", user.getId(), e);
-            throw new RuntimeException("Failed to store avatar file", e);
-        }
+        // Видаляємо старий аватар
+        avatarService.deleteAvatar(user.getAvatarUrl());
+
+        // Зберігаємо новий
+        String relativePath = avatarService.saveAvatar(user, avatar);
+        user.setAvatarUrl(relativePath);
+
+        userRepository.save(user);
     }
 
-    private void validateFileSize(MultipartFile file) {
-        if (file.getSize() > maxFileSizeBytes) {
-            throw new IllegalArgumentException(
-                    String.format("File size exceeds maximum allowed size of %d bytes", maxFileSizeBytes)
-            );
-        }
-    }
-
-    private String storeAvatar(MultipartFile avatar, Long userId) throws IOException {
-        Path uploadPath = Paths.get(avatarUploadDir);
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectories(uploadPath);
-        }
-
-        // Генеруємо унікальне ім'я файлу
-        String originalFilename = avatar.getOriginalFilename();
-        String fileExtension = originalFilename != null ?
-                originalFilename.substring(originalFilename.lastIndexOf(".")) : ".jpg";
-        String filename = userId + "_" + System.currentTimeMillis() + fileExtension;
-
-        Path filePath = uploadPath.resolve(filename);
-        avatar.transferTo(filePath.toFile());
-
-        return filename;
+    @Transactional
+    public void deleteAvatar(User user) {
+        avatarService.deleteAvatar(user.getAvatarUrl());
+        user.setAvatarUrl(null);
+        userRepository.save(user);
     }
 
     @Transactional
