@@ -31,7 +31,7 @@ public class UserService {
     }
 
     @Transactional
-    public void updateProfile(User user, UserProfileUpdateDTO dto) {
+    public UserProfileDTO updateProfile(User user, UserProfileUpdateDTO dto) {
         if (dto.getFirstName() != null) user.setFirstName(dto.getFirstName());
         if (dto.getLastName() != null) user.setLastName(dto.getLastName());
         if (dto.getUsername() != null) user.setUsername(dto.getUsername());
@@ -44,20 +44,19 @@ public class UserService {
         if (dto.getPhoneNumber() != null) user.setPhoneNumber(dto.getPhoneNumber());
 
         userRepository.save(user);
+        return UserMapper.toProfileDTO(user);
     }
 
     @Transactional
-    public void updateAvatar(User user, MultipartFile avatar) {
-        if (avatar == null || avatar.isEmpty()) return;
+    public UserProfileDTO updateAvatar(User user, MultipartFile avatar) {
+        if (avatar == null || avatar.isEmpty()) return UserMapper.toProfileDTO(user);
 
-        // Видаляємо старий аватар
         avatarService.deleteAvatar(user.getAvatarUrl());
-
-        // Зберігаємо новий
         String relativePath = avatarService.saveAvatar(user, avatar);
         user.setAvatarUrl(relativePath);
 
         userRepository.save(user);
+        return UserMapper.toProfileDTO(user);
     }
 
     @Transactional

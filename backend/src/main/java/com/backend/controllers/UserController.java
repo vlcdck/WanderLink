@@ -12,8 +12,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/profile")
@@ -28,33 +30,40 @@ public class UserController {
 
     // Часткове оновлення текстових даних
     @PatchMapping("/me")
-    public ResponseEntity<String> updateProfile(
+    public ResponseEntity<UserProfileDTO> updateProfile(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody UserProfileUpdateDTO dto
     ) {
-        userService.updateProfile(principal.getUser(), dto);
-        return ResponseEntity.ok("Profile updated successfully");
+        UserProfileDTO updatedProfile = userService.updateProfile(principal.getUser(), dto);
+        return ResponseEntity.ok(updatedProfile);
     }
+
 
     // Окремо зміна пароля
     @PatchMapping("/me/password")
-    public ResponseEntity<String> changePassword(
+    public ResponseEntity<?> changePassword(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody ChangePasswordDTO dto
     ) {
-        userService.changePassword(principal.getUser(), dto);
-        return ResponseEntity.ok("Password changed successfully");
+        try {
+            userService.changePassword(principal.getUser(), dto);
+            return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     // Окремо аватарка
     @PatchMapping("/me/avatar")
-    public ResponseEntity<String> updateAvatar(
+    public ResponseEntity<UserProfileDTO> updateAvatar(
             @AuthenticationPrincipal UserPrincipal principal,
-            @Valid @ModelAttribute UserAvatarDTO dto
+            @RequestParam("avatar") MultipartFile avatar
     ) {
-        userService.updateAvatar(principal.getUser(), dto.getAvatar());
-        return ResponseEntity.ok("Avatar updated successfully");
+        UserProfileDTO updatedProfile = userService.updateAvatar(principal.getUser(), avatar);
+        return ResponseEntity.ok(updatedProfile); // 🔥 повертаємо профіль
     }
+
+
 
     @DeleteMapping("me/avatar")
     public ResponseEntity<String> deleteAvatar(

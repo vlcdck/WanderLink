@@ -20,6 +20,8 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import static org.springframework.security.config.Customizer.withDefaults;
+
 //@Configuration
 //@EnableWebSecurity
 //@EnableMethodSecurity
@@ -73,13 +75,11 @@ public class SecurityConfig {
     private final CustomUserDetailsService userDetailsService;
     private final CustomOAuth2SuccessHandler successHandler;
 
-    // ===== Password encoder =====
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // ===== AuthenticationProvider =====
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
@@ -88,13 +88,11 @@ public class SecurityConfig {
         return provider;
     }
 
-    // ===== AuthenticationManager =====
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 
-    // ===== REST-friendly AuthenticationEntryPoint =====
     @Bean
     public AuthenticationEntryPoint restAuthenticationEntryPoint() {
         return (request, response, authException) -> {
@@ -104,20 +102,18 @@ public class SecurityConfig {
         };
     }
 
-    // ===== Security Filter Chain =====
+    // 🔑 SecurityFilterChain
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-
         http
                 .csrf(csrf -> csrf.disable())
+                .cors(withDefaults()) // 🔑 підключає той CorsConfigurationSource
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/public/**").permitAll() // якщо будуть публічні API
+                        .requestMatchers("/api/public/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(restAuthenticationEntryPoint())
-                )
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(restAuthenticationEntryPoint()))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
